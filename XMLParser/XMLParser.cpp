@@ -30,7 +30,9 @@ static void ReportError(PCTSTR szMessage);
 static BOOL StoreValues(IXMLDOMNode* pNode, PCTSTR attrName, map<PCTSTR, PCTSTR>* keysMap);
 static void Store(IXMLDOMNode* pNode, PCTSTR szAttrName, map<PCTSTR, PCTSTR>* keysMap);
 
-TCHAR szTitle[20] = L"XMLParser";
+static int g_COMInitializeCount = 0;
+
+TCHAR szTitle[] = _T("XMLParser");
 
 /**
  * @brief
@@ -56,12 +58,19 @@ TCHAR szTitle[20] = L"XMLParser";
 BOOL WINAPI Initialize(IXMLDOMElement** pRootElement, PCTSTR szXMLuri)
 {
 	BOOL bRet = TRUE;
-	if (FAILED(CoInitialize(NULL))) {
-		return FALSE;
+
+	if (!g_COMInitializeCount) {
+		if (FAILED(CoInitialize(NULL))) {
+			return FALSE;
+		}
+		g_COMInitializeCount++;
 	}
 	
 	if ((bRet = LoadDOMRaw(pRootElement, szXMLuri)) == FALSE) {
-		CoUninitialize();
+		if (g_COMInitializeCount > 0) {
+			CoUninitialize();
+			g_COMInitializeCount--;
+		}
 	}
 	return bRet;
 }
@@ -84,7 +93,10 @@ BOOL WINAPI Initialize(IXMLDOMElement** pRootElement, PCTSTR szXMLuri)
 void WINAPI UnInitialize(IXMLDOMElement* pRootElement)
 {
 	SAFE_RELEASE(pRootElement);
-	CoUninitialize();
+	if (g_COMInitializeCount > 0) {
+		CoUninitialize();
+		g_COMInitializeCount--;
+	}
 }
 
 // ↓メモリリークする可能性があるので使用禁止。
@@ -633,6 +645,7 @@ void WINAPI CleanupStoredValues(map<PCTSTR, PCTSTR>* keysMap)
 	}
 	keysMap->clear();
 	delete keysMap;
+	keysMap = NULL;
 }
 
 /**
