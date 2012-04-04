@@ -188,7 +188,8 @@ BOOL LoadDOMRaw(IXMLDOMElement** pRootElement, PCTSTR szXMLuri)
 	} else {
 		CHECK_HR(pXMLDom->get_parseError(&pXMLError));
 		CHECK_HR(pXMLError->get_reason(&bstrError));
-		ReportError(bstrError);
+		//ReportError(bstrError);
+		hr = S_FALSE;
 	}
 
 Cleanup:
@@ -230,7 +231,7 @@ BOOL WINAPI GetDOMTree(IXMLDOMElement* pRootElement, PCTSTR szNodeName, IXMLDOMN
 {
 	HRESULT hr = S_OK;
 	if (pRootElement == NULL) {
-		ReportError(TEXT("先にXMLの読み込みを行ってください。"));
+		//ReportError(TEXT("先にXMLの読み込みを行ってください。"));
 		return FALSE;
 	}
 	BSTR bstrNodeName = NULL;
@@ -746,8 +747,8 @@ void Store(IXMLDOMNode* pNode, PCTSTR szAttrName, map<PCTSTR, PCTSTR>* keysMap)
 				if (szValue) {
 					delete [] szValue;
 				}
-				ReportError(_T("[ERROR] メモリの確保に失敗しました。終了します。"));
-				exit(1);
+				//ReportError(_T("[ERROR] メモリの確保に失敗しました。終了します。"));
+				exit(EXIT_FAILURE);
 			}
 		} catch (bad_alloc &ba) {
 			if (szKey) {
@@ -756,8 +757,8 @@ void Store(IXMLDOMNode* pNode, PCTSTR szAttrName, map<PCTSTR, PCTSTR>* keysMap)
 			if (szValue) {
 				delete [] szValue;
 			}
-			MessageBoxA(NULL, ba.what(), "XMLParser", MB_OK | MB_ICONERROR);
-			exit(1);
+			//MessageBoxA(NULL, ba.what(), "XMLParser", MB_OK | MB_ICONERROR);
+			exit(EXIT_FAILURE);
 		} catch (...) {
 			if (szKey) {
 				delete [] szKey;
@@ -765,8 +766,8 @@ void Store(IXMLDOMNode* pNode, PCTSTR szAttrName, map<PCTSTR, PCTSTR>* keysMap)
 			if (szValue) {
 				delete [] szValue;
 			}
-			ReportError(_T("[ERROR] メモリの確保中に例外が発生しました。終了します。"));
-			exit(1);
+			//ReportError(_T("[ERROR] メモリの確保中に例外が発生しました。終了します。"));
+			exit(EXIT_FAILURE);
 		}
 
 		GetAttribute(pParent, szAttrName, szKey, bufferSize);
