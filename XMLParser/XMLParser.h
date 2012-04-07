@@ -68,6 +68,8 @@ extern "C" {
 	// StoreValuesで作成したMapへのアクセサです。
 	DLL_EXPORT PCTSTR WINAPI GetMapItem(map<PCTSTR, PCTSTR>* pMap, PCTSTR szKey);
 
+	void XMLParserExit(int errorCode);
+
 #ifdef __cplusplus
 }
 #endif

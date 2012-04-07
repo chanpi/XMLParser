@@ -748,7 +748,7 @@ void Store(IXMLDOMNode* pNode, PCTSTR szAttrName, map<PCTSTR, PCTSTR>* keysMap)
 					delete [] szValue;
 				}
 				//ReportError(_T("[ERROR] メモリの確保に失敗しました。終了します。"));
-				exit(EXIT_FAILURE);
+				XMLParserExit(EXIT_FAILURE);
 			}
 		} catch (bad_alloc &ba) {
 			if (szKey) {
@@ -758,7 +758,7 @@ void Store(IXMLDOMNode* pNode, PCTSTR szAttrName, map<PCTSTR, PCTSTR>* keysMap)
 				delete [] szValue;
 			}
 			//MessageBoxA(NULL, ba.what(), "XMLParser", MB_OK | MB_ICONERROR);
-			exit(EXIT_FAILURE);
+			XMLParserExit(EXIT_FAILURE);
 		} catch (...) {
 			if (szKey) {
 				delete [] szKey;
@@ -767,7 +767,7 @@ void Store(IXMLDOMNode* pNode, PCTSTR szAttrName, map<PCTSTR, PCTSTR>* keysMap)
 				delete [] szValue;
 			}
 			//ReportError(_T("[ERROR] メモリの確保中に例外が発生しました。終了します。"));
-			exit(EXIT_FAILURE);
+			XMLParserExit(EXIT_FAILURE);
 		}
 
 		GetAttribute(pParent, szAttrName, szKey, bufferSize);
@@ -778,4 +778,9 @@ void Store(IXMLDOMNode* pNode, PCTSTR szAttrName, map<PCTSTR, PCTSTR>* keysMap)
 
 Cleanup:
 	return;
+}
+
+void XMLParserExit(int errorCode)
+{
+	exit(errorCode);
 }
