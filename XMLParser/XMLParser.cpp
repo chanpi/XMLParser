@@ -11,6 +11,7 @@
 
 #include "stdafx.h"
 #include "XMLParser.h"
+#include "SharedConstants.h"
 
 // Macro that calls a COM method returning HRESULT value.
 #define CHECK_HR(stmt)	do { hr=(stmt); if(hr!=S_OK) goto Cleanup; } while (0)
@@ -29,6 +30,8 @@ static HRESULT CreateAndInitDOM(IXMLDOMDocument** ppDoc);
 static void ReportError(PCTSTR szMessage);
 static BOOL StoreValues(IXMLDOMNode* pNode, PCTSTR attrName, map<PCTSTR, PCTSTR>* keysMap);
 static void Store(IXMLDOMNode* pNode, PCTSTR szAttrName, map<PCTSTR, PCTSTR>* keysMap);
+
+//static LONG dump_exception(_EXCEPTION_POINTERS *ep);
 
 static int g_COMInitializeCount = 0;
 
@@ -165,8 +168,8 @@ BOOL LoadDOMRaw(IXMLDOMElement** pRootElement, PCTSTR szXMLuri)
 	BSTR bstrXMLuri = NULL;
 	BSTR bstrXML = NULL;
 	BSTR bstrError = NULL;
-	VARIANT_BOOL varStatus;
-	VARIANT varFileName;
+	VARIANT_BOOL varStatus = 0;
+	VARIANT varFileName = {0};
 	VariantInit(&varFileName);
 
 	CHECK_HR(CreateAndInitDOM(&pXMLDom));
@@ -423,7 +426,9 @@ BOOL WINAPI GetNodeName(IXMLDOMNode* pNode, PTSTR resBuffer, SIZE_T cchLength)
 	HRESULT hr = S_OK;
 	BSTR bstrName = NULL;
 	CHECK_HR(pNode->get_nodeName(&bstrName));
-	_tcscpy_s(resBuffer, cchLength, bstrName);
+	if (bstrName != NULL) {
+		_tcscpy_s(resBuffer, cchLength, bstrName);
+	}
 
 Cleanup:
 	SysFreeString(bstrName);
@@ -504,7 +509,7 @@ BOOL WINAPI GetAttribute(IXMLDOMNode* pNode, PCTSTR attrName, PTSTR attrValue, S
 	IXMLDOMNamedNodeMap* pNodeMap = NULL;
 	IXMLDOMNode* pAttrItem = NULL;
 	BSTR bstrAttrName = NULL;
-	VARIANT varAttrValue;
+	VARIANT varAttrValue = {0};
 
 	CHECK_HR(pNode->get_attributes(&pNodeMap));
 	CHECK_HR(pNodeMap->get_length(&attributeCount));
@@ -514,7 +519,7 @@ BOOL WINAPI GetAttribute(IXMLDOMNode* pNode, PCTSTR attrName, PTSTR attrValue, S
 			VariantInit(&varAttrValue);
 
 			pAttrItem->get_nodeName(&bstrAttrName);
-			if (_tcscmp(bstrAttrName, attrName) == 0) {
+			if (bstrAttrName != NULL && attrName != NULL && _tcscmp(bstrAttrName, attrName) == 0) {
 				pAttrItem->get_nodeValue(&varAttrValue);
 				_tcscpy_s(attrValue, cchLength, varAttrValue.bstrVal);
 			}
@@ -642,7 +647,7 @@ void WINAPI CleanupStoredValues(map<PCTSTR, PCTSTR>* keysMap)
 	while (it != keysMap->end()) {
 		delete [] it->first;
 		delete [] it->second;
-		it++;
+		++it;
 	}
 	keysMap->clear();
 	delete keysMap;
@@ -678,7 +683,7 @@ PCTSTR WINAPI GetMapItem(map<PCTSTR, PCTSTR>* pMap, PCTSTR szKey)
 		if (!_tcsicmp(szKey, it->first)) {
 			return it->second;
 		}
-		it++;
+		++it;
 	}
 	return NULL;
 }
@@ -737,9 +742,11 @@ void Store(IXMLDOMNode* pNode, PCTSTR szAttrName, map<PCTSTR, PCTSTR>* keysMap)
 	if (nodeType == NODE_TEXT) {
 		CHECK_HR(pNode->get_parentNode(&pParent));
 
+		//__try
+		//{
 		try {
-			szKey = new TCHAR[bufferSize];
-			szValue = new TCHAR[bufferSize];
+			szKey	= new TCHAR[bufferSize];	// CleanupStoredValues()で解放
+			szValue	= new TCHAR[bufferSize];	// CleanupStoredValues()で解放
 			if (szKey == NULL || szValue == NULL) {
 				if (szKey) {
 					delete [] szKey;
@@ -747,8 +754,9 @@ void Store(IXMLDOMNode* pNode, PCTSTR szAttrName, map<PCTSTR, PCTSTR>* keysMap)
 				if (szValue) {
 					delete [] szValue;
 				}
-				//ReportError(_T("[ERROR] メモリの確保に失敗しました。終了します。"));
+				ReportError(_T(MESSAGE_ERROR_MEMORY_INVALID));
 				XMLParserExit(EXIT_FAILURE);
+				return;
 			}
 		} catch (bad_alloc &ba) {
 			if (szKey) {
@@ -757,19 +765,26 @@ void Store(IXMLDOMNode* pNode, PCTSTR szAttrName, map<PCTSTR, PCTSTR>* keysMap)
 			if (szValue) {
 				delete [] szValue;
 			}
-			//MessageBoxA(NULL, ba.what(), "XMLParser", MB_OK | MB_ICONERROR);
+			MessageBoxA(NULL, ba.what(), "XMLParser", MB_OK | MB_ICONERROR);
 			XMLParserExit(EXIT_FAILURE);
-		} catch (...) {
-			if (szKey) {
-				delete [] szKey;
-			}
-			if (szValue) {
-				delete [] szValue;
-			}
-			//ReportError(_T("[ERROR] メモリの確保中に例外が発生しました。終了します。"));
-			XMLParserExit(EXIT_FAILURE);
+			return;
 		}
+		//}
+		//__except (dump_exception(GetExceptionInformation())){
+		//		if (szKey) {
+		//			delete [] szKey;
+		//		}
+		//		if (szValue) {
+		//			delete [] szValue;
+		//		}
+		//		TCHAR szError[bufferSize] = {0};
+		//		_stprintf_s(szError, _countof(szError), _T("%s <error: %d>"), _T(MESSAGE_ERROR_UNKNOWN), GetExceptionCode());
+		//		ReportError(szError);
+		//		XMLParserExit(EXIT_FAILURE);
+		//}
 
+		ZeroMemory(szKey, sizeof(TCHAR) * bufferSize);
+		ZeroMemory(szValue, sizeof(TCHAR) * bufferSize);
 		GetAttribute(pParent, szAttrName, szKey, bufferSize);
 		GetNodeValue(pNode, szValue, bufferSize);
 
@@ -779,6 +794,30 @@ void Store(IXMLDOMNode* pNode, PCTSTR szAttrName, map<PCTSTR, PCTSTR>* keysMap)
 Cleanup:
 	return;
 }
+
+//LONG dump_exception(_EXCEPTION_POINTERS *ep)
+//{
+//	PEXCEPTION_RECORD rec = ep->ExceptionRecord;
+//
+//	TCHAR buf[1024];
+//	_stprintf_s(buf, _countof(buf), _T("code:%x flag:%x addr:%p params:%d\n"),
+//		rec->ExceptionCode,
+//		rec->ExceptionFlags,
+//		rec->ExceptionAddress,
+//		rec->NumberParameters
+//	);
+//	::OutputDebugString(buf);
+//
+//	for (DWORD i = 0; i < rec->NumberParameters; i++){
+//		_stprintf_s(buf, _countof(buf), _T("param[%d]:%x\n"),
+//			i,
+//			rec->ExceptionInformation[i]
+//		);
+//		::OutputDebugString(buf);
+//	}
+//
+//	return EXCEPTION_EXECUTE_HANDLER;
+//}
 
 void XMLParserExit(int errorCode)
 {
